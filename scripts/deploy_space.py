@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 
 from huggingface_hub import HfApi
+from huggingface_hub.errors import HfHubHTTPError
 
 ROOT = Path(__file__).resolve().parents[1]
 SPACE_HEADER = """\
@@ -43,7 +44,12 @@ def main() -> None:
     api = HfApi(token=os.environ["HF_TOKEN"])
     owner = api.whoami()["name"]
     repo_id = f"{owner}/{os.environ.get('SPACE_NAME') or 'msme-scheme-assistant'}"
-    api.create_repo(repo_id, repo_type="space", space_sdk="docker", exist_ok=True)
+    try:
+        # free hardware explicitly: without it the Hub can answer 402 (payment method required)
+        api.create_repo(repo_id, repo_type="space", space_sdk="docker", space_hardware="cpu-basic", exist_ok=True)
+    except HfHubHTTPError as e:
+        body = e.response.text[:500] if e.response is not None else ""
+        raise SystemExit(f"could not create Space {repo_id}: {e}\n{body}") from e
     for name in SECRETS:
         if os.environ.get(name):
             api.add_space_secret(repo_id, name, os.environ[name])
