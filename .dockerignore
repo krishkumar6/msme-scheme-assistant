@@ -1,7 +1,13 @@
 .venv
+.venv-merge
+llama.cpp
+runtime
+colab_upload
 data
+!data/raw/manifest.json
 out
 **/__pycache__
 .pytest_cache
 .env
-*.egg-info
+**/*.egg-info
+.git

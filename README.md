@@ -150,6 +150,19 @@ Docker:
 docker compose run --rm ingest && docker compose up -d api
 ```
 
+### Deployment
+
+The image ships with the search index built in: `scripts/fetch_index.py` downloads a 30 MB bundle
+(Chroma index + query adapter) from this repo's GitHub release and checks its SHA-256, and both ONNX
+models are downloaded at build time. A cold start needs no PDFs and no ingest.
+
+It runs on a free **Hugging Face Docker Space**. The app peaks at about 580 MB of RAM (two ONNX models
+plus Chroma), which is more than the 512 MB of most free container hosts. Every push to `main` runs
+the tests and then `scripts/deploy_space.py`, which uploads the repo to the Space. One-time setup:
+add a Hugging Face write token as the `HF_TOKEN` repository secret, and `GROQ_API_KEY` /
+`GEMINI_API_KEY` as secrets too (they are copied into the Space). The Space's disk is not persistent,
+so feedback collected there resets when the Space restarts.
+
 ## CLI
 
 | Command | Purpose |
