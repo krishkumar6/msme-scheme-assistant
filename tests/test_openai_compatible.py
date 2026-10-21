@@ -22,6 +22,7 @@ class _Stub(BaseHTTPRequestHandler):
     seen: list[dict] = []
     statuses: list[int] = []  # consumed one per request; empty -> 200
     error_message = "slow down"
+    retry_after = "0"
 
     def do_POST(self):  # noqa: N802
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -29,7 +30,7 @@ class _Stub(BaseHTTPRequestHandler):
         status = _Stub.statuses.pop(0) if _Stub.statuses else 200
         if status != 200:
             self.send_response(status)
-            self.send_header("retry-after", "0")
+            self.send_header("retry-after", _Stub.retry_after)
             self.end_headers()
             self.wfile.write(json.dumps({"error": {"message": _Stub.error_message}}).encode())
             return
@@ -90,6 +91,15 @@ def test_daily_quota_is_not_retried(stub_url):
     _Stub.error_message = "Rate limit reached for model on tokens per day (TPD): Limit 200000"
     gen = OpenAICompatibleGenerator(stub_url, "m", "gsk_test", name="groq:test")
     with pytest.raises(GenerationError, match="daily quota"):
+        gen.complete(_req())
+    assert len(_Stub.seen) == 1
+
+
+def test_long_rate_limit_wait_fails_over_instead_of_sleeping(stub_url, monkeypatch):
+    _Stub.statuses = [429]
+    monkeypatch.setattr(_Stub, "retry_after", "30")
+    gen = OpenAICompatibleGenerator(stub_url, "m", "gsk_test", name="groq:test")
+    with pytest.raises(GenerationError, match="rate-limited for 30s"):
         gen.complete(_req())
     assert len(_Stub.seen) == 1
 

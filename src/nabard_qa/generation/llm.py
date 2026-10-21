@@ -55,7 +55,7 @@ _DAILY_LIMIT = re.compile(r"per day|\bTPD\b|\bRPD\b|daily", re.I)
 
 class OpenAICompatibleGenerator:
     def __init__(self, base_url: str, model: str, api_key: str | None, name: str, max_tokens: int = 4096,
-                 max_retries: int = 3, max_wait_s: float = 20.0, reasoning_effort: str | None = None,
+                 max_retries: int = 2, max_wait_s: float = 3.0, reasoning_effort: str | None = None,
                  timeout_s: float = 120.0) -> None:
         self.timeout_s = timeout_s  # socket timeout: max silence before giving up
         self.base_url = base_url.rstrip("/")
@@ -88,7 +88,10 @@ class OpenAICompatibleGenerator:
                     wait = float(e.headers.get("retry-after", ""))
                 except ValueError:
                     wait = 2.0 * 2**attempt
-                wait = min(max(wait, 0.5), self.max_wait_s)
+                if wait > self.max_wait_s:
+                    # the next provider answers sooner than this one recovers (Gemini: 4-8 s)
+                    raise GenerationError(f"{self.name} rate-limited for {wait:.0f}s") from e
+                wait = max(wait, 0.5)
                 log.warning("%s HTTP %s; retrying in %.1fs (%d/%d)", self.name, e.code, wait,
                             attempt + 1, self.max_retries)
                 time.sleep(wait)
