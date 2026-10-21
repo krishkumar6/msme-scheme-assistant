@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     dense_weight: float = 1.0
     lexical_weight: float = 1.0
     reranker_model: str | None = "Xenova/ms-marco-MiniLM-L-6-v2"
+    # int8 ONNX + the first 128 words of each passage: 2.4x faster reranking than fp32 / full passages,
+    # with golden-set hit@6 unchanged (0.96) and hit@1 0.54 -> 0.60. 96 words drops hit@6 to 0.86.
+    reranker_quantized: bool = True
+    rerank_max_words: int = 128  # 0 = let the model read its full 512 tokens
     # The cross-encoder is the slowest retrieval stage on CPU (~0.12 s/passage here).
     # 15 vs 30 candidates: identical golden-set retrieval, 1.35 s vs 3.6 s.
     rerank_candidates: int = 15

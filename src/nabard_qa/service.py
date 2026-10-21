@@ -126,7 +126,8 @@ class QAService:
         reranker = None
         if settings.reranker_model:
             try:
-                reranker = CrossEncoderReranker(settings.reranker_model, settings.model_cache_dir)
+                reranker = CrossEncoderReranker(settings.reranker_model, settings.model_cache_dir,
+                                                settings.reranker_quantized, settings.rerank_max_words)
             except Exception as e:  # noqa: BLE001 - reranking is an optimisation, not a dependency
                 log.warning("reranker unavailable (%s); continuing with fused ranking", e)
         feedback = FeedbackStore(settings.db_path)

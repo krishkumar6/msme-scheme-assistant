@@ -91,7 +91,7 @@ Gujarat interest and capital subsidy. Every expected fact was checked against th
 | Metric | Value |
 |---|---|
 | Retrieval hit@6 (all expected facts in the top-6 context) | **0.96** (48/50; the 4 state questions all hit) |
-| Retrieval hit@1 / MRR | 0.54 / 0.707 |
+| Retrieval hit@1 / MRR | 0.60 / 0.735 |
 | MSME scheme answers (Groq `gpt-oss-120b`): fact recall / cited | **1.0 / 1.0** (9/9) |
 | Out-of-scope questions declined (SBI home loan rate, IPL, Tamil Nadu MSME policy) | **3/3** (measured before Tamil Nadu was added; that item is now Kerala and not yet re-run) |
 | Fact recall of answers, *extractive mode, no LLM* (2-report corpus) | 0.784 |
@@ -165,6 +165,19 @@ cross-encoder scoring passages 16 at a time: every pair was padded to the longes
 ONNX runtime kept that buffer. Scoring one pair at a time gives identical scores, is faster on CPU
 (2.8 s vs 6.6 s for 40 passages), and brings the peak to ~465 MB: Chroma ~95 MB, embedding model
 ~150 MB, reranker ~100 MB, a query ~45 MB.
+
+The free plan also has only 0.1 CPU, and the first deploy took ~34 s per question, almost all of
+it in the cross-encoder. Two changes cut reranking 2.4x on the golden set: the int8-quantized ONNX
+file of the same model, and scoring only the first 128 words of each passage. hit@6 stayed at 0.96
+and hit@1 rose from 0.54 to 0.60 (the opening of a passage is its most specific part). 96 words was
+too few (hit@6 0.86), and reranking 10 candidates instead of 15 lost two questions.
+
+| Reranker (15 candidates) | hit@6 | hit@1 | MRR | time/question (local) |
+|---|---|---|---|---|
+| fp32, full passage | 0.96 | 0.54 | 0.707 | 0.85 s |
+| int8, full passage | 0.96 | 0.54 | 0.707 | 0.47 s |
+| **int8, first 128 words** (default) | **0.96** | **0.60** | **0.735** | **0.35 s** |
+| int8, first 96 words | 0.86 | 0.48 | 0.606 | 0.29 s |
 
 The free plan sleeps after 15 minutes idle (about a minute to wake) and has no persistent disk, so
 feedback collected there resets on each deploy or restart.

@@ -30,7 +30,7 @@ RUN if [ -n "$INDEX_URL" ]; then python scripts/fetch_index.py "$INDEX_URL" "$IN
 RUN python -c "from nabard_qa.config import get_settings; from nabard_qa.retrieval.embeddings import Embedder; \
 from nabard_qa.retrieval.reranker import CrossEncoderReranker; s = get_settings(); \
 Embedder(s.embedding_model, s.model_cache_dir, s.query_instruction).embed_query('warm up'); \
-CrossEncoderReranker(s.reranker_model, s.model_cache_dir).score('warm up', ['warm up'])"
+CrossEncoderReranker(s.reranker_model, s.model_cache_dir, s.reranker_quantized, s.rerank_max_words).score('warm up', ['warm up'])"
 
 RUN useradd --create-home --uid 1000 app && chown -R app /app
 USER app
