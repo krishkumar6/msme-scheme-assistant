@@ -1,0 +1,27 @@
+.venv/
+.venv-merge/
+llama.cpp/
+runtime/
+*.gguf
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+*.egg-info/
+
+# generated data (rebuild with `nabard-qa ingest`)
+data/index/
+data/models/
+data/processed/
+data/adapter/
+data/training/
+data/app.db*
+out/
+
+# source PDFs are public but large; see README for download links
+data/raw/*.pdf
+data/incoming/
+
+colab_upload/
+src/*.egg-info/
+training/__pycache__/

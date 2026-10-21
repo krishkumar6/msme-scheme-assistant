@@ -1,0 +1,15 @@
+# Ollama model definition for the fine-tuned NABARD QA model (Qwen2.5 ChatML format).
+# Put nabard-qa-q8_0.gguf (from training/finetune_colab.ipynb) next to this file, then:
+#   ollama create nabard-qa -f Modelfile
+FROM ./nabard-qa-q8_0.gguf
+
+# The app sends system + history + ~6 source passages (3-5k tokens). Ollama's
+# default context is smaller and would silently cut the sources off.
+PARAMETER num_ctx 8192
+PARAMETER temperature 0.1
+PARAMETER stop "<|im_end|>"
+
+TEMPLATE """{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""

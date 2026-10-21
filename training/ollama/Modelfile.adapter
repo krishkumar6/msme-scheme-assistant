@@ -1,0 +1,20 @@
+# Fine-tuned NABARD QA model without downloading the 3 GB HF base: Ollama's own
+# Qwen2.5-1.5B-Instruct (~1 GB, 4-bit) plus the LoRA adapter applied at load time.
+#   python llama.cpp/convert_lora_to_gguf.py out/nabard-qa-lora/adapter --base <Qwen2.5-1.5B-Instruct config dir> \
+#       --outtype f16 --outfile training/ollama/nabard-qa-lora-f16.gguf
+#   ollama pull qwen2.5:1.5b-instruct
+#   ollama create nabard-qa -f Modelfile.adapter
+# The adapter was trained on a 4-bit (QLoRA) base, so a 4-bit base at inference is a close match.
+FROM qwen2.5:1.5b-instruct
+ADAPTER ./nabard-qa-lora-f16.gguf
+
+# The app sends system + history + ~6 source passages (3-5k tokens). Ollama's
+# default context is smaller and would silently cut the sources off.
+PARAMETER num_ctx 8192
+PARAMETER temperature 0.1
+PARAMETER stop "<|im_end|>"
+
+TEMPLATE """{{- range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""

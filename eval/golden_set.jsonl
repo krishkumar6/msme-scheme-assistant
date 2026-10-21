@@ -1,0 +1,57 @@
+# Golden QA set. Facts were checked by hand against the source reports (pages noted in comments).
+# Lines starting with '#' are ignored.
+{"id": "ec-01", "question": "What was India's GDP growth rate in 2017-18 according to the NABARD report?", "expected_facts": ["6.7 per cent"], "year": "2017-18"}
+{"id": "ag-01", "question": "What was the total foodgrains production in 2017-18?", "expected_facts": ["279.5"], "year": "2017-18"}
+{"id": "ag-02", "question": "What was the MSP of wheat in 2017-18 and its A2+FL cost of production?", "expected_facts": ["1,735", "817"], "year": "2017-18"}
+{"id": "cr-01", "question": "How much ground level credit was disbursed to agriculture in 2017-18?", "expected_facts": ["11,79,428"], "year": "2017-18"}
+{"id": "cr-02", "question": "What was the share of term loans in agricultural ground level credit in 2017-18?", "expected_facts": ["35.6 per cent"], "year": "2017-18"}
+{"id": "cap-01", "question": "By how much did the NABARD (Amendment) Act 2018 raise NABARD's authorised capital?", "expected_facts": ["30,000 crore"], "year": "2017-18"}
+{"id": "st-01", "question": "What is the ST-SAO refinance limit for State Cooperative Banks in the North-Eastern Region in 2017-18?", "expected_facts": ["60 per cent of RLP"], "year": "2017-18"}
+{"id": "st-02", "question": "How much was disbursed under Additional ST-SAO to StCBs and RRBs in 2017-18?", "expected_facts": ["15,308", "4,828"], "year": "2017-18"}
+{"id": "lt-01", "question": "What is the minimum CRAR norm for NBFCs to be eligible for NABARD long term refinance in 2017-18?", "expected_facts": ["15 per cent for NBFCs"], "year": "2017-18"}
+{"id": "lt-02", "question": "What were total long-term refinance disbursements in 2017-18?", "expected_facts": ["65,240"], "year": "2017-18"}
+{"id": "fpo-01", "question": "How many FPOs had NABARD promoted as on 31 March 2018 and how many were registered?", "expected_facts": ["4,004", "2,044"], "year": "2017-18"}
+{"id": "fpo-02", "question": "What tax benefit did the Union Budget 2018-19 announce for Farmer Producer Companies?", "expected_facts": ["100 per cent tax deduction"], "year": "2017-18"}
+{"id": "fpo-03", "question": "What equity grant can an FPC get under SFAC's Equity Grant Scheme in 2017-18?", "expected_facts": ["10 lakh"], "year": "2017-18"}
+{"id": "fpo-04", "question": "What is the turnover and membership of Mulkanoor Cooperative Society in 2017-18?", "expected_facts": ["290 crore", "7,400"], "year": "2017-18"}
+{"id": "shg-01", "question": "What was the total savings of SHGs with banks as on 31 March 2018?", "expected_facts": ["19,592"], "year": "2017-18"}
+{"id": "shg-02", "question": "What was the NPA level of SHG loans as on 31 March 2018?", "expected_facts": ["6.12"], "year": "2017-18"}
+{"id": "shg-03", "question": "How many SHGs had been digitised under E-Shakti by 31 March 2020?", "expected_facts": ["6.54 lakh"], "year": "2019-20"}
+{"id": "cc-01", "question": "How many climate change projects has NABARD sanctioned and for what amount in 2017-18?", "expected_facts": ["1,593"], "year": "2017-18"}
+{"id": "ws-01", "question": "What was the total corpus of the Watershed Development Fund as on 31 March 2018?", "expected_facts": ["1,241.53"], "year": "2017-18"}
+{"id": "wc-01", "question": "How many villages were covered by NABARD's Water Campaign in 2017?", "expected_facts": ["1,01,569"], "year": "2017-18"}
+{"id": "ridf-01", "question": "What was the RIDF corpus for Tranche XXIII in 2017-18?", "expected_facts": ["25,000 crore"], "year": "2017-18"}
+{"id": "ridf-02", "question": "What were RIDF sanctions for irrigation in 2017-18?", "expected_facts": ["10,642"], "year": "2017-18"}
+{"id": "ltif-01", "question": "What interest rate and repayment period apply to loans under the Long Term Irrigation Fund in 2017-18?", "expected_facts": ["6 per cent"], "year": "2017-18"}
+{"id": "wif-01", "question": "What is the corpus of the Warehouse Infrastructure Fund in 2017-18?", "expected_facts": ["5,000 crore"], "year": "2017-18"}
+{"id": "fpf-01", "question": "What is the corpus of the Food Processing Fund and who can borrow from it in 2017-18?", "expected_facts": ["2,000 crore"], "year": "2017-18"}
+{"id": "pmay-01", "question": "How much did NABARD lend to NRIDA under PMAY-G in 2017-18?", "expected_facts": ["7,329.43"], "year": "2017-18"}
+{"id": "did-01", "question": "What is the corpus of the Dairy Processing and Infrastructure Development Fund in 2017-18?", "expected_facts": ["8,000 crore"], "year": "2017-18"}
+{"id": "mif-01", "question": "What corpus was announced for the Micro Irrigation Fund in 2017-18?", "expected_facts": ["5,000 crore"], "year": "2017-18"}
+{"id": "msme-01", "question": "Under the Stand Up India scheme, what loan range is available and who is eligible?", "expected_facts": ["10 lakh", "1 crore"], "year": null}
+{"id": "msme-02", "question": "How much capital subsidy has NABARD released under CLCSS for micro and small enterprises in 2017-18?", "expected_facts": ["70.97"], "year": "2017-18"}
+{"id": "is-01", "question": "What is the interest subvention scheme for short-term crop loans to farmers in 2017-18?", "expected_facts": ["7 per cent", "3 lakh"], "year": "2017-18"}
+{"id": "fin-01", "question": "What was NABARD's capital adequacy ratio as on 31 March 2018?", "expected_facts": ["18.85"], "year": "2017-18"}
+{"id": "fin-02", "question": "What was NABARD's profit after tax in 2017-18?", "expected_facts": ["2,961.95"], "year": "2017-18"}
+{"id": "fin-03", "question": "What was NABARD's balance sheet size at the end of 2019-20?", "expected_facts": ["5,32,075"], "year": "2019-20"}
+{"id": "rrb-01", "question": "How many Regional Rural Banks are there and how many branches do they have in 2017-18?", "expected_facts": ["56", "21,422"], "year": "2017-18"}
+{"id": "aud-01", "question": "Who were the statutory auditors of NABARD for 2017-18?", "expected_facts": ["Vyas & Vyas"], "year": "2017-18"}
+{"id": "kcc-01", "question": "Up to what KCC limit is interest subvention available for fisheries and animal husbandry in 2019-20?", "expected_facts": ["2.0 lakh"], "year": "2019-20"}
+{"id": "na-01", "question": "What is the current home loan interest rate at SBI?", "answerable": false}
+{"id": "na-02", "question": "Who won the IPL in 2018?", "answerable": false}
+{"id": "vish-03", "question": "What subsidy does the PM Vishwakarma scheme give to carpenters?", "expected_facts": ["15,000"], "year": null}
+# MSME scheme documents (added with the 16-document corpus)
+{"id": "pmegp-01", "question": "What is the maximum project cost allowed under PMEGP for a manufacturing unit and for a business or service unit?", "expected_facts": ["50 lakh", "20 lakh"], "year": null}
+{"id": "pmegp-02", "question": "How much margin money subsidy does PMEGP give in rural and urban areas for general and special category applicants?", "expected_facts": ["25%", "15%", "35%"], "year": null}
+{"id": "cgtmse-01", "question": "Up to what loan amount can a bank cover a micro or small enterprise borrower under the CGTMSE credit guarantee scheme?", "expected_facts": ["10 crore"], "year": null}
+{"id": "cgtmse-02", "question": "What percentage of guarantee cover does CGTMSE give to micro enterprises for loans up to 5 lakh?", "expected_facts": ["85%"], "year": null}
+{"id": "vish-01", "question": "What loans can an artisan get under PM Vishwakarma and at what interest rate?", "expected_facts": ["1 lakh", "2 lakh", "5%"], "year": null}
+{"id": "vish-02", "question": "How much toolkit incentive and training stipend do PM Vishwakarma beneficiaries receive?", "expected_facts": ["15,000", "500"], "year": null}
+{"id": "mudra-01", "question": "What are the loan limits for Shishu, Kishor and Tarun under Pradhan Mantri MUDRA Yojana?", "expected_facts": ["50,000", "5 lakh", "10 lakh"], "year": null}
+{"id": "cdp-01", "question": "How much grant does the Government of India give for setting up a Common Facility Centre under MSE-CDP?", "expected_facts": ["70%", "60%"], "year": null}
+{"id": "na-04", "question": "What capital subsidy does the Kerala MSME policy give to women entrepreneurs?", "answerable": false}
+# State MSME policies (Tamil Nadu, Gujarat - the Gujarat GR is OCR'd from a scan)
+{"id": "tn-01", "question": "What investment and employment targets does the Tamil Nadu MSME Policy 2021 set?", "expected_facts": ["2,00,000 crore", "20 lakh"], "year": null}
+{"id": "tn-02", "question": "What capital subsidy and additional capital subsidy does the Tamil Nadu MSME Policy 2021 give micro enterprises?", "expected_facts": ["25%", "10%"], "year": null}
+{"id": "gj-01", "question": "What interest subsidy does the Aatmanirbhar Gujarat scheme give MSMEs in Category 1 talukas?", "expected_facts": ["7%", "35 lakh"], "year": null}
+{"id": "gj-02", "question": "What capital investment subsidy does the Aatmanirbhar Gujarat scheme give micro enterprises in Category 1 talukas?", "expected_facts": ["25%", "35 lakh"], "year": null}

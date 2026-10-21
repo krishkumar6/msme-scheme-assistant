@@ -1,0 +1,17 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # one-off: docker compose run --rm ingest
+  ingest:
+    build: .
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    command: ["nabard-qa", "ingest"]
+    profiles: ["tools"]

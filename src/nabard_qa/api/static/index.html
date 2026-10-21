@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MSME &amp; NABARD Scheme Assistant</title>
+<style>
+  :root {
+    --bg: #f6f7f4; --panel: #ffffff; --ink: #1d2a22; --muted: #5d6b62; --line: #dfe4dc;
+    --accent: #2f7a3e; --accent-soft: #e6f2e7; --warn: #9a5b00; --warn-soft: #fff4e0; --bad: #a33a2b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #121714; --panel: #1a211c; --ink: #e5ece6; --muted: #9aa89e; --line: #2c372f;
+            --accent: #6fc27f; --accent-soft: #203527; --warn: #f0b45a; --warn-soft: #33281a; --bad: #ef8a7a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+  header { padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 13px; }
+  header .controls { margin-left: auto; display: flex; gap: 10px; align-items: center; font-size: 13px; }
+  select, textarea, input, button { font: inherit; color: inherit; }
+  select, textarea { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px 16px 140px; }
+  .profile { margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  .profile summary { cursor: pointer; }
+  .profile .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+  .profile label { display: flex; flex-direction: column; gap: 3px; }
+  .profile select, .profile input { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; width: 100%; }
+  .profile .actions { margin-top: 8px; display: flex; gap: 10px; align-items: center; }
+  .profile .actions button { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; cursor: pointer; padding: 2px 10px; font-size: 12px; }
+  .suggest { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 20px; }
+  .suggest button { border: 1px solid var(--line); background: var(--panel); border-radius: 16px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  .suggest button:hover { border-color: var(--accent); }
+  .msg { margin: 14px 0; }
+  .msg.user .bubble { background: var(--accent-soft); margin-left: 15%; }
+  .bubble { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-wrap: anywhere; }
+  .bubble ul { margin: 6px 0; padding-left: 20px; }
+  .bubble p { margin: 6px 0; }
+  .cite { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 5px; margin: 0 1px; border-radius: 4px; background: var(--accent-soft); color: var(--accent); cursor: pointer; vertical-align: 1px; }
+  .status { font-size: 12px; color: var(--muted); margin-top: 6px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .badge { padding: 1px 7px; border-radius: 10px; font-size: 11px; background: var(--accent-soft); color: var(--accent); }
+  .badge.warn { background: var(--warn-soft); color: var(--warn); }
+  .fb button { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; cursor: pointer; padding: 2px 9px; }
+  .fb button.on { border-color: var(--accent); background: var(--accent-soft); }
+  details.sources { margin-top: 8px; }
+  details.sources summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  .src { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: var(--panel); font-size: 13px; }
+  .src.flash { outline: 2px solid var(--accent); }
+  .src .h { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .src .h b { color: var(--accent); }
+  .src .sec { color: var(--muted); }
+  .src pre { white-space: pre-wrap; font: 12px/1.45 ui-monospace, Consolas, monospace; margin: 6px 0 4px; max-height: 180px; overflow: auto; }
+  .src .rel button { font-size: 12px; border: 1px solid var(--line); background: transparent; border-radius: 5px; cursor: pointer; padding: 1px 7px; }
+  .src .rel button.on.good { border-color: var(--accent); color: var(--accent); }
+  .src .rel button.on.bad { border-color: var(--bad); color: var(--bad); }
+  form { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 12px 16px; }
+  form .row { max-width: 900px; margin: 0 auto; display: flex; gap: 10px; }
+  form textarea { flex: 1; resize: none; height: 52px; padding: 10px; }
+  form button { background: var(--accent); color: #fff; border: 0; border-radius: 8px; padding: 0 20px; cursor: pointer; font-weight: 600; }
+  form button:disabled { opacity: .5; cursor: default; }
+  .hint { max-width: 900px; margin: 6px auto 0; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>MSME &amp; NABARD Scheme Assistant</h1>
+  <span class="meta" id="meta">loading…</span>
+  <div class="controls">
+    <label title="Deep: ~40 passages to the long-context model, for comparisons, summaries and 'list all' questions">Mode
+      <select id="mode"><option value="fast">Fast</option><option value="deep">Deep</option></select></label>
+    <label>Report year <select id="year"><option value="">All</option></select></label>
+  </div>
+</header>
+<main>
+  <details class="profile" id="profileBox">
+    <summary id="profileSummary">Your profile (optional): answers check eligibility against it and search your state's policy</summary>
+    <div class="grid">
+      <label>State / UT <select data-p="State"><option value="">—</option></select></label>
+      <label>Gender <select data-p="Gender"><option value="">—</option><option>Woman</option><option>Man</option><option>Transgender</option></select></label>
+      <label>Social category <select data-p="Category"><option value="">—</option><option>General</option><option>OBC</option><option>SC</option><option>ST</option><option>Minority</option><option>Ex-serviceman</option><option>Person with disability</option></select></label>
+      <label>Area <select data-p="Area"><option value="">—</option><option>Rural</option><option>Urban</option></select></label>
+      <label>Sector <select data-p="Sector"><option value="">—</option><option>Manufacturing</option><option>Service</option><option>Trading</option><option>Agriculture / allied</option><option>Traditional artisan / craft</option></select></label>
+      <label>Enterprise <select data-p="Enterprise"><option value="">—</option><option>New unit (not started)</option><option>Existing micro unit</option><option>Existing small unit</option><option>Existing medium unit</option></select></label>
+      <label>Age <input data-p="Age" type="number" min="14" max="100" inputmode="numeric"></label>
+      <label>Amount needed <input data-p="Amount needed" maxlength="40" placeholder="e.g. ₹15 lakh"></label>
+      <label style="grid-column: 1 / -1">Anything else <input data-p="Notes" maxlength="200" placeholder="e.g. dairy unit, 8th pass, already have a MUDRA loan"></label>
+    </div>
+    <div class="actions"><button type="button" id="profileClear">Clear profile</button><span>Saved in this browser only.</span></div>
+  </details>
+  <div class="suggest" id="suggest"></div>
+  <div id="chat"></div>
+</main>
+<form id="form">
+  <div class="row">
+    <textarea id="q" placeholder="Ask about an MSME scheme, eligibility, subsidy, loan guarantee, or NABARD…" maxlength="1000"></textarea>
+    <button id="send" type="submit">Ask</button>
+  </div>
+  <div class="hint">Answers are generated from official MSME scheme guidelines, FAQs, policies and NABARD annual reports, and cite their sources. Confirm current rules with the implementing agency before applying.</div>
+</form>
+<script>
+const $ = (s) => document.querySelector(s);
+const chat = $("#chat");
+const turns = [];
+const SUGGESTIONS = [
+  "Am I eligible for a PMEGP subsidy, and how much subsidy can I get?",
+  "What does CGTMSE guarantee cover, and what is the maximum loan?",
+  "Who is eligible for PM Vishwakarma and what benefits does it give?",
+  "Which state capital subsidy can I get for a new manufacturing unit?",
+  "Who is eligible for the Stand Up India scheme and what loan amount is available?",
+  "What support does NABARD provide to Farmer Producer Organisations?",
+  "What refinance limits does NABARD give State Cooperative Banks in the North East under ST-SAO?",
+];
+
+// ---- applicant profile: structured fields -> "State: Tamil Nadu; Gender: Woman; ..." (kept in localStorage)
+const STATES = ["Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
+  "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya",
+  "Mizoram", "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", "Chandigarh",
+  "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry"];
+const PROFILE_KEY = "msme-qa-profile";
+const pFields = () => [...document.querySelectorAll("[data-p]")];
+function profileText() {
+  const parts = pFields().filter((f) => f.value.trim()).map((f) => `${f.dataset.p}: ${f.value.trim()}`);
+  return parts.length ? parts.join("; ") : null;
+}
+function profileChanged() {
+  const vals = Object.fromEntries(pFields().map((f) => [f.dataset.p, f.value]));
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(vals)); } catch (_) { /* storage blocked: profile lasts this page only */ }
+  const short = pFields().filter((f) => f.value.trim() && f.dataset.p !== "Notes").map((f) => f.value.trim());
+  $("#profileSummary").textContent = short.length ? `Your profile: ${short.join(" · ")}`
+    : "Your profile (optional): answers check eligibility against it and search your state's policy";
+}
+function initProfile() {
+  const sel = document.querySelector('[data-p="State"]');
+  for (const s of STATES) { const o = document.createElement("option"); o.textContent = s; sel.appendChild(o); }
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}") || {}; } catch (_) { saved = {}; }
+  for (const f of pFields()) { if (saved[f.dataset.p]) f.value = saved[f.dataset.p]; f.addEventListener("change", profileChanged); }
+  $("#profileClear").onclick = () => { pFields().forEach((f) => { f.value = ""; }); profileChanged(); };
+  profileChanged();
+}
+
+function esc(s) { return s.replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function render(md) {
+  // minimal, XSS-safe markdown: escape first, then bold / bullets / paragraphs / citation chips
+  const lines = esc(md).split("\n");
+  let html = "", inList = false;
+  for (const raw of lines) {
+    const line = raw.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+    const h = line.match(/^\s*#{1,4}\s+(.*)/);
+    const m = line.match(/^\s*(?:[-*•]|\d+\.)\s+(.*)/);
+    if (m && !/^\s*[-*]{3,}\s*$/.test(line)) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li${/^\s{2,}/.test(raw) ? ' style="margin-left:18px"' : ""}>${m[1]}</li>`;
+      continue;
+    }
+    if (inList) { html += "</ul>"; inList = false; }
+    if (h) html += `<p style="font-weight:600;margin-top:12px">${h[1]}</p>`;
+    else if (/^\s*([-*_])\1{2,}\s*$/.test(line)) html += '<hr style="border:0;border-top:1px solid var(--line)">';
+    else if (line.trim()) html += `<p>${line}</p>`;
+  }
+  if (inList) html += "</ul>";
+  // while streaming, text is raw model output: drop zero-width spaces, accept 【S1】 / ［S1］
+  return html.replace(/[​-‍⁠﻿]/g, "")
+    .replace(/[\[【［]\s*S(\d{1,2})\s*[\]】］]/g, '<span class="cite" data-ref="S$1">S$1</span>');
+}
+
+function addMsg(role, text) {
+  const el = document.createElement("div");
+  el.className = `msg ${role}`;
+  el.innerHTML = `<div class="bubble">${role === "user" ? esc(text) : ""}</div>`;
+  chat.appendChild(el);
+  el.scrollIntoView({ behavior: "smooth", block: "end" });
+  return el;
+}
+
+function sourceCards(el, sources, cited) {
+  if (!sources.length) return;
+  const box = document.createElement("details");
+  box.className = "sources";
+  box.open = false;
+  box.innerHTML = `<summary>${sources.length} source passages (${cited.size} cited) — mark which were relevant to improve future answers</summary>`;
+  for (const s of sources) {
+    const card = document.createElement("div");
+    card.className = "src";
+    card.id = `${el.dataset.id}-${s.ref}`;
+    card.dataset.chunk = s.chunk_id;
+    card.innerHTML = `<div class="h"><b>${s.ref}</b><span>${esc(s.report)} · ${esc(s.pages || "")}</span>
+      <span class="sec">${esc(s.section || "")}</span>${cited.has(s.ref) ? '<span class="badge">cited</span>' : ""}</div>
+      <pre>${esc(s.snippet)}</pre>
+      <div class="rel"><button type="button" class="good">relevant</button> <button type="button" class="bad">not relevant</button></div>`;
+    card.querySelectorAll(".rel button").forEach((b) => b.onclick = () => {
+      const on = !b.classList.contains("on");
+      card.querySelectorAll(".rel button").forEach((x) => x.classList.remove("on"));
+      if (on) b.classList.add("on");
+    });
+    box.appendChild(card);
+  }
+  el.appendChild(box);
+  el.querySelectorAll(".cite").forEach((c) => c.onclick = () => {
+    box.open = true;
+    const card = document.getElementById(`${el.dataset.id}-${c.dataset.ref}`);
+    if (card) { card.scrollIntoView({ behavior: "smooth", block: "center" }); card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 1200); }
+  });
+}
+
+function feedbackBar(el, result) {
+  const bar = document.createElement("div");
+  bar.className = "status";
+  const grounded = result.grounded ? '<span class="badge">grounded in sources</span>' : '<span class="badge warn">no source cited</span>';
+  bar.innerHTML = `${grounded}<span>${esc(result.provider)} · ${result.latency_ms} ms</span>
+    <span class="fb">Helpful? <button type="button" data-r="1">👍</button> <button type="button" data-r="-1">👎</button></span><span class="ack"></span>`;
+  bar.querySelectorAll(".fb button").forEach((b) => b.onclick = async () => {
+    bar.querySelectorAll(".fb button").forEach((x) => x.classList.remove("on"));
+    b.classList.add("on");
+    const rel = [], irr = [];
+    el.querySelectorAll(".src").forEach((c) => {
+      if (c.querySelector(".good.on")) rel.push(c.dataset.chunk);
+      if (c.querySelector(".bad.on")) irr.push(c.dataset.chunk);
+    });
+    const res = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ answer_id: result.answer_id, rating: Number(b.dataset.r), relevant_chunk_ids: rel, irrelevant_chunk_ids: irr }) });
+    bar.querySelector(".ack").textContent = res.ok ? "Thanks — feedback recorded." : "Could not record feedback.";
+  });
+  el.appendChild(bar);
+}
+
+async function ask(question) {
+  const send = $("#send");
+  send.disabled = true;
+  addMsg("user", question);
+  const el = addMsg("assistant", "");
+  el.dataset.id = `m${Date.now()}`;
+  const bubble = el.querySelector(".bubble");
+  // live status until the first token: retrieval and model "thinking" are otherwise silent
+  const started = performance.now();
+  let stage = "Searching the reports";
+  const tick = () => { bubble.innerHTML = `<span class="meta">${esc(stage)}… ${((performance.now() - started) / 1000).toFixed(1)}s</span>`; };
+  tick();
+  let timer = setInterval(tick, 100);
+  const stopTimer = () => { if (timer) { clearInterval(timer); timer = null; } };
+  let text = "", sources = [], result = null;
+  try {
+    const res = await fetch("/api/ask/stream", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, history: turns.slice(-8), year: $("#year").value || null,
+        profile: profileText(), mode: $("#mode").value }) });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const reader = res.body.getReader(), dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+        if (!line.startsWith("data:")) continue;
+        const ev = JSON.parse(line.slice(5));
+        if (ev.type === "sources") {
+          sources = ev.sources;
+          stage = sources.length ? `Found ${sources.length} passages · ${ev.model} is thinking` : `No relevant passages · ${ev.model}`;
+          tick();
+        }
+        else if (ev.type === "delta") { stopTimer(); text += ev.text; bubble.innerHTML = render(text); }
+        else if (ev.type === "done") { result = ev.result; }
+        else if (ev.type === "error") { throw new Error(ev.detail); }
+      }
+    }
+  } catch (e) {
+    stopTimer();
+    bubble.innerHTML = `<span style="color:var(--bad)">${esc(String(e.message || e))}</span>`;
+  }
+  stopTimer();
+  if (result) {
+    bubble.innerHTML = render(result.answer);
+    const cited = new Set(result.citations.filter((c) => c.cited).map((c) => c.ref));
+    sourceCards(el, sources, cited);
+    feedbackBar(el, result);
+    turns.push({ role: "user", content: question }, { role: "assistant", content: result.answer });
+  }
+  send.disabled = false;
+  el.scrollIntoView({ behavior: "smooth", block: "end" });
+}
+
+$("#form").onsubmit = (e) => { e.preventDefault(); const q = $("#q").value.trim(); if (q) { $("#q").value = ""; ask(q); } };
+$("#q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("#form").requestSubmit(); } });
+initProfile();
+for (const s of SUGGESTIONS) {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = s; b.onclick = () => ask(s); $("#suggest").appendChild(b);
+}
+fetch("/health").then((r) => r.json()).then((h) => {
+  $("#meta").textContent = `${h.chunks} passages indexed · fast: ${h.provider} · deep: ${h.deep_provider}${h.adapter_active ? " · feedback adapter on" : ""}`;
+  for (const y of h.years) { const o = document.createElement("option"); o.value = y; o.textContent = y; $("#year").appendChild(o); }
+}).catch(() => { $("#meta").textContent = "service unavailable"; });
+</script>
+</body>
+</html>
