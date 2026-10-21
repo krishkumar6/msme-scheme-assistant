@@ -1,0 +1,20 @@
+# Render Blueprint: Dashboard -> New -> Blueprint -> pick this repo.
+# Free plan: 512 MB RAM (the app peaks at ~465 MB), sleeps after 15 min idle, ~1 min cold start.
+services:
+  - type: web
+    name: msme-scheme-assistant
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false  # entered in the dashboard, never stored in the repo
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NABARD_QA_LLM_CHAIN
+        value: groq,gemini
+      - key: NABARD_QA_LOG_LEVEL
+        value: INFO

@@ -156,12 +156,18 @@ The image ships with the search index built in: `scripts/fetch_index.py` downloa
 (Chroma index + query adapter) from this repo's GitHub release and checks its SHA-256, and both ONNX
 models are downloaded at build time. A cold start needs no PDFs and no ingest.
 
-It runs on a free **Hugging Face Docker Space**. The app peaks at about 580 MB of RAM (two ONNX models
-plus Chroma), which is more than the 512 MB of most free container hosts. Every push to `main` runs
-the tests and then `scripts/deploy_space.py`, which uploads the repo to the Space. One-time setup:
-add a Hugging Face write token as the `HF_TOKEN` repository secret, and `GROQ_API_KEY` /
-`GEMINI_API_KEY` as secrets too (they are copied into the Space). The Space's disk is not persistent,
-so feedback collected there resets when the Space restarts.
+It runs on **Render's free plan** (`render.yaml`: Dashboard → New → Blueprint → this repo, then
+enter `GROQ_API_KEY` and `GEMINI_API_KEY`). Render rebuilds on every push to `main`; GitHub Actions
+runs the tests.
+
+Fitting 512 MB took one change. Peak memory was ~750 MB, and almost all of the excess came from the
+cross-encoder scoring passages 16 at a time: every pair was padded to the longest passage, and the
+ONNX runtime kept that buffer. Scoring one pair at a time gives identical scores, is faster on CPU
+(2.8 s vs 6.6 s for 40 passages), and brings the peak to ~465 MB: Chroma ~95 MB, embedding model
+~150 MB, reranker ~100 MB, a query ~45 MB.
+
+The free plan sleeps after 15 minutes idle (about a minute to wake) and has no persistent disk, so
+feedback collected there resets on each deploy or restart.
 
 ## CLI
 

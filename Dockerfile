@@ -34,6 +34,8 @@ CrossEncoderReranker(s.reranker_model, s.model_cache_dir).score('warm up', ['war
 
 RUN useradd --create-home --uid 1000 app && chown -R app /app
 USER app
+# hosts such as Render pass the port to listen on in $PORT
+ENV PORT=8000
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s --start-period=90s CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
-CMD ["nabard-qa", "serve", "--host", "0.0.0.0", "--port", "8000"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/health')"
+CMD ["sh", "-c", "exec nabard-qa serve --host 0.0.0.0 --port \"$PORT\""]
