@@ -21,6 +21,7 @@ from nabard_qa.generation.llm import (
 class _Stub(BaseHTTPRequestHandler):
     seen: list[dict] = []
     statuses: list[int] = []  # consumed one per request; empty -> 200
+    error_message = "slow down"
 
     def do_POST(self):  # noqa: N802
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
@@ -30,7 +31,7 @@ class _Stub(BaseHTTPRequestHandler):
             self.send_response(status)
             self.send_header("retry-after", "0")
             self.end_headers()
-            self.wfile.write(b'{"error": {"message": "slow down"}}')
+            self.wfile.write(json.dumps({"error": {"message": _Stub.error_message}}).encode())
             return
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -46,7 +47,7 @@ class _Stub(BaseHTTPRequestHandler):
 
 @pytest.fixture
 def stub_url():
-    _Stub.seen, _Stub.statuses = [], []
+    _Stub.seen, _Stub.statuses, _Stub.error_message = [], [], "slow down"
     server = HTTPServer(("127.0.0.1", 0), _Stub)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{server.server_port}/openai/v1"
@@ -81,6 +82,16 @@ def test_persistent_rate_limit_becomes_generation_error(stub_url):
     with pytest.raises(GenerationError, match="429"):
         gen.complete(_req())
     assert len(_Stub.seen) == 3
+
+
+def test_daily_quota_is_not_retried(stub_url):
+    # Groq's daily cap: three 20 s retries only delayed the hand-over to Gemini by a minute
+    _Stub.statuses = [429, 429, 429]
+    _Stub.error_message = "Rate limit reached for model on tokens per day (TPD): Limit 200000"
+    gen = OpenAICompatibleGenerator(stub_url, "m", "gsk_test", name="groq:test")
+    with pytest.raises(GenerationError, match="daily quota"):
+        gen.complete(_req())
+    assert len(_Stub.seen) == 1
 
 
 def test_client_errors_are_not_retried(stub_url):

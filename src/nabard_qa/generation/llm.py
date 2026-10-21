@@ -50,6 +50,9 @@ class Generator(Protocol):
 # --------------------------------------------------------------------------- #
 # OpenAI-compatible chat APIs: Groq, Gemini, or the fine-tuned model on llama.cpp / vLLM
 # --------------------------------------------------------------------------- #
+_DAILY_LIMIT = re.compile(r"per day|\bTPD\b|\bRPD\b|daily", re.I)
+
+
 class OpenAICompatibleGenerator:
     def __init__(self, base_url: str, model: str, api_key: str | None, name: str, max_tokens: int = 4096,
                  max_retries: int = 3, max_wait_s: float = 20.0, reasoning_effort: str | None = None,
@@ -75,6 +78,12 @@ class OpenAICompatibleGenerator:
                 retryable = e.code == 429 or e.code >= 500
                 if not retryable or attempt == self.max_retries:
                     raise
+                if e.code == 429:
+                    detail = e.read().decode("utf-8", "replace")
+                    if _DAILY_LIMIT.search(detail):
+                        # waiting can't lift a daily cap: hand over to the next provider now
+                        # (three 20 s retries used to delay every answer by a minute)
+                        raise GenerationError(f"{self.name} daily quota reached") from e
                 try:
                     wait = float(e.headers.get("retry-after", ""))
                 except ValueError:
