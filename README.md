@@ -1,360 +1,276 @@
-# MSME & NABARD Scheme Assistant: a RAG-based GenAI QnA chatbot
+# MSME & NABARD Scheme Assistant
 
-Ask about MSME schemes (eligibility, subsidy, loan limits, guarantees), state MSME policy,
-and NABARD's schemes, refinance, development funds and financial statements, in plain
-English, Hindi or Hinglish. Every answer cites the document and page it came from. If the
-indexed documents don't cover a question, the assistant says so instead of guessing.
+**Ask a question about a government scheme, get an answer you can check.**
 
-Corpus: 18 official documents, 2,057 printed pages, 4,913 indexed passages. They're listed with
-titles in `data/raw/manifest.json`.
+**Live demo:** https://msme-scheme-assistant.onrender.com
+(free server, so the first question after a quiet spell takes a minute to wake it up, and answers take about 20–35 seconds)
 
-| Source | Documents |
+---
+
+## Why I built this
+
+If you run a small business in India, there is a lot of money meant for you: subsidies for
+setting up a unit, collateral-free loans, credit guarantees, toolkits for artisans. Finding out
+what *you* qualify for is the hard part. The rules are spread across long PDFs from different
+ministries and states, written in dense official language, and they change every few years.
+
+This assistant reads those documents so you don't have to. You ask in plain English, Hindi or
+Hinglish. For example:
+
+- *"I'm a woman starting a ₹30 lakh food processing unit in a village. How much PMEGP subsidy can I get?"*
+- *"What does CGTMSE guarantee cover, and what is the maximum loan?"*
+- *"What toolkit incentive do carpenters get under PM Vishwakarma?"*
+- *"What refinance limits does NABARD give cooperative banks in the North East?"*
+
+You get a short answer, and **every claim is tagged with its source**, like **[S2]**. Click the
+tag and you see the exact passage, document and page it came from. If the documents don't
+cover your question, it says so instead of making something up. I cared about that more than
+anything else: a confident wrong answer about a subsidy rate can cost someone real money.
+
+There's also an optional profile (your state, category, sector, and so on). With it, answers
+check each eligibility rule against your situation, and a question like *"which capital
+subsidy can I get?"* searches your own state's policy.
+
+## What it knows
+
+18 official documents: 2,057 pages, split into 4,913 searchable passages.
+
+| | Documents |
 |---|---|
-| Central MSME schemes | MSME Schemes Booklet 2025-26 (DC-MSME); PMEGP revised guidelines; CGTMSE CGS-I scheme document (1 Apr 2025); PM Vishwakarma guidelines; PMMY/MUDRA FAQ; Stand-Up India factsheet; MSE-CDP guidelines (2022) and FAQs |
-| Ministry of MSME | Annual Reports 2024-25 and 2025-26 |
-| State policy | Uttar Pradesh MSME Promotion Policy 2022; Tamil Nadu MSME Policy 2021; Aatmanirbhar Gujarat Scheme for Assistance to MSMEs (GR 05-10-2022) |
-| NABARD | Annual Reports 2017-18, 2018-19, 2019-20, 2024-25, 2025-26 |
+| **Central MSME schemes** | MSME Schemes Booklet 2025-26, PMEGP guidelines, CGTMSE credit guarantee scheme (Apr 2025), PM Vishwakarma guidelines, MUDRA FAQ, Stand-Up India factsheet, MSE-CDP cluster development guidelines and FAQs |
+| **Ministry of MSME** | Annual Reports 2024-25 and 2025-26 |
+| **State policies** | Uttar Pradesh MSME Policy 2022, Tamil Nadu MSME Policy 2021, Gujarat's Aatmanirbhar MSME scheme (2022) |
+| **NABARD** | Annual Reports 2017-18, 2018-19, 2019-20, 2024-25, 2025-26 |
 
-To add more PDFs, drop them in `data/raw/`, give each a title and year in `manifest.json`, and run
-`nabard-qa ingest`. Without a manifest entry, a document is labelled "NABARD Annual Report <year>".
-
-Scanned PDFs have no text to extract (Gujarat publishes its GRs this way). Give them a text layer
-first: `python scripts/make_searchable_pdf.py scanned.pdf data/raw/name.pdf`. It OCRs only the
-image-only pages, using the OCR engine built into Windows (`scripts/ocr_pages.ps1`; no Tesseract or
-model download), and writes each recognised line as invisible text at its position, so ingestion
-treats the file like any other. The 28-page Gujarat GR takes about 35 s. On Linux, `ocrmypdf` does
-the same job.
-
-Tables printed sideways on an upright page (Tamil Nadu's incentive annexure) are detected from the
-text direction, turned upright, and read cell by cell from their ruling lines, giving one
-`scheme | location | incentive | limit | …` line per row.
+## How it works, in one picture
 
 ```
-                ┌──────────── ingestion (offline, idempotent) ────────────┐
- PDFs ─► PyMuPDF layout + pdfminer glyph repair ─► clean ─► structure-aware chunks
-        (rotated spreads split into printed pages,      (sections, captions, table rows,
-         running headers removed by frequency)            TOC filtered, content-hash ids)
-                                                    │
-                                     bge-small embeddings ─► ChromaDB  +  BM25 index
-                └─────────────────────────────────────────────────────────┘
-
- question ─► follow-up rewrite ─► dense (query adapter) ⊕ BM25 ─► RRF ─► cross-encoder rerank
-          ─► + feedback boost from similar past questions ─► relevance gate
-          ─► LLM chain (grounded prompt, [S#] citations, streaming) ─► answer + sources
-                                                    │
-                         👍/👎 + per-source relevant/irrelevant ─► SQLite
-                           ├─ immediate: boosts/demotes passages for similar questions
-                           ├─ periodic: trains the query-embedding adapter
-                           └─ dataset: thumbs-up answers become fine-tuning examples
+ Official PDFs ─► extract text (and repair it) ─► split into passages ─► search index
+                                                                            │
+ Your question ─► find likely passages (meaning + keywords) ─► re-rank them carefully
+              ─► nothing relevant? say so honestly
+              ─► otherwise an LLM writes a short answer, citing each passage it used
+                                                                            │
+ Your 👍 / 👎 and "this source was / wasn't useful" ─► search gets better for similar questions
 ```
 
-## What's notable
+This pattern is called RAG (retrieval-augmented generation). The language model never answers
+from memory. It only gets to rephrase what the retrieved passages say.
 
-**The PDF text layer is broken, and ingestion recovers it.** Most narrative pages of the 2017-18
-report use Georgia subsets that name glyphs by ID (`/g68`) and ship a ToUnicode map that covers
-only some codes. Standard extractors (pypdf, plain PyMuPDF) return a substitution cipher on those
-pages: `rìê aüèîÜü êé†ü†û∞` instead of "The Indian economy". `ingestion/pdf_extract.py` decodes the
-glyph IDs (TrueType standard order: `gid + 29` for ASCII, plus a verified table of ligatures, ₹,
-dashes, quotes and small caps), then puts the corrected characters into PyMuPDF's layout by matching
-each character's position on the page. Rotated landscape spreads are split into their two printed
-pages, and the printed page numbers are captured so citations match the page the reader sees.
-`tests/test_pdf_integration.py` locks this behaviour in.
+## The interesting problems
 
-**Tables stay usable.** Cells on the same baseline are joined as `Kerala | 1,11,351 | 8,668 | …`.
-Table chunks are split by row, and each piece repeats the caption and the header row, so a number is
-never separated from what it measures.
+Most of the work wasn't the chatbot. It was getting clean, trustworthy text out of government
+PDFs and making search good enough that the right passage is actually there.
 
-**Retrieval is hybrid and gated.** BM25 catches the exact tokens these reports are full of (ST-SAO,
-LTIF, `1,59,822`), and dense search catches paraphrases. A cross-encoder reranks the fused list. The
-reranker score also acts as a calibrated "is anything relevant?" gate, which is how the assistant
-declines out-of-scope questions.
+**Some PDFs lie about their own text.** Copy text from the 2017-18 NABARD report and you get
+`rìê aüèîÜü êé†ü†û∞` instead of "The Indian economy". The fonts are broken: they name characters by
+internal IDs and only half-map them to real letters. I decode those IDs directly, then put the
+corrected letters back into the page layout by matching each character's position. Two-page
+landscape spreads are split back into their printed pages, so a citation says "p. 47" and you
+find it on page 47.
 
-**The feedback loop changes retrieval.** Users rate an answer and can mark individual sources as
-relevant or irrelevant. Each rating:
-1. takes effect immediately: passages rated on *similar* past questions (cosine ≥ 0.82) get a bounded
-   boost or demotion. Passages rated *relevant* are also **recalled** into the candidate set when a
-   new phrasing of the question doesn't retrieve them. The cross-encoder still scores them, so
-   feedback can't push an irrelevant passage past the relevance gate;
-2. becomes a contrastive training pair for the **query adapter**, a linear map on query embeddings
-   trained with InfoNCE and kept close to the identity. Documents never need re-embedding, and the
-   adapter is only activated if it beats the base embeddings on held-out pairs;
-3. if it's a thumbs-up, becomes a fine-tuning example.
+**Tables are where the numbers live, and they break easily.** A subsidy rate is useless if it
+gets separated from the row that says what it's for. Table rows are kept together as
+`scheme | location | incentive | limit`. Each piece of a long table repeats its caption and
+header row. Two tables needed special care:
+- Tamil Nadu prints its incentive table **sideways** on an upright page. The extractor notices
+  the text runs bottom-to-top, turns the page upright, and reads it cell by cell from the
+  grid lines.
+- In one NABARD table, the numbers sat a fraction of a point higher than their labels, so every
+  value slid up a row. Grouping cells that start within 2 points of each other fixed it.
 
-## Results (measured on this machine, `eval/golden_set.jsonl`)
+**Gujarat only publishes scans.** Its scheme document is photographs of paper, with no text at
+all. `scripts/make_searchable_pdf.py` runs the OCR engine that comes with Windows (no extra
+download) and lays the recognised text invisibly over each page. After that, the rest of the
+pipeline treats it like any other PDF. The 28 pages took 35 seconds.
 
-53 hand-checked questions: 50 answerable and 3 out of scope. Of the answerable ones, 37 are NABARD
-figures and terms; they name their report year, because with five report years an undated question
-has a different correct answer. 9 are central MSME scheme rules: PMEGP, CGTMSE, PM Vishwakarma,
-MUDRA, Stand-Up India and MSE-CDP. 4 are state policy: Tamil Nadu targets and capital subsidy,
-Gujarat interest and capital subsidy. Every expected fact was checked against the indexed text.
+**Search uses two methods because each misses things.** Keyword search (BM25) catches exact terms
+like `ST-SAO` or `₹1,59,822`. Meaning-based search catches paraphrases ("loan guarantee" vs
+"credit guarantee"). A third, more careful model (a cross-encoder) then re-reads the top 15
+candidates against the question and reorders them. Its score also decides when nothing is
+relevant enough to answer from.
 
-| Metric | Value |
+**Long, personal questions confused the search.** *"I am a 24 year old woman in a rural area…
+can I get PMEGP subsidy?"* scored badly even when the right passage was found, because the
+re-ranker was trained on short web searches. When that happens, the question is condensed
+into a short search ("PMEGP subsidy eligibility female rural food processing 30 lakh") and
+tried once more. That question now gets the right answer: special category, 35% of ₹30 lakh
+= ₹10.5 lakh. Before the fix, the model was handed no sources and guessed a wrong rate. Now,
+when nothing is found, it doesn't call the model at all.
+
+**Feedback actually changes the search.** When you rate an answer, or mark a source as useful
+or not:
+- **Right away**, passages you rated move up or down for *similar* questions from anyone. A
+  useful passage can even be pulled in when a new phrasing of the question would have missed
+  it. Unrelated questions aren't affected.
+- **Over time**, ratings train a small adjustment to how questions are matched to passages (a
+  "query adapter"). It's only switched on if it scores better on questions it hasn't seen.
+- **Good answers** become training examples for the fine-tuned model.
+
+I checked this end to end. After one user rated sources for *"What guarantee cover does CGTMSE
+give to women entrepreneurs?"*, a differently worded question from someone else saw the
+unhelpful passage demoted and the helpful one, which that wording hadn't found at all, pulled
+into the results. A question about PM Vishwakarma kept exactly the same ranking.
+
+**Making it run on a free server.** The free plan gives 512 MB of memory and a tenth of a CPU.
+The app first needed about 750 MB. Nearly all of the excess came from the re-ranker scoring 16
+passages at once, each padded to the longest one. Scoring one at a time gave identical scores,
+cut peak memory to about 465 MB, and was faster too. For speed, I switched to the 8-bit version
+of the same re-ranker and let it read the first 128 words of each passage. That made re-ranking
+2.4 times faster, and accuracy went *up*, because the start of a passage is usually its most
+specific part:
+
+| Re-ranker setting | Right passage in top 6 | Right passage first | Time per question (laptop) |
+|---|---|---|---|
+| original (full precision, whole passage) | 96% | 54% | 0.85 s |
+| 8-bit, whole passage | 96% | 54% | 0.47 s |
+| **8-bit, first 128 words** (used now) | **96%** | **60%** | **0.35 s** |
+| 8-bit, first 96 words | 86% | 48% | 0.29 s |
+
+Even so, a tenth of a CPU is slow: about 20–28 seconds to find passages, plus a few seconds to
+write the answer. A $7/month instance would bring that to around 5 seconds.
+
+## How well it works
+
+I wrote 53 test questions by hand and checked every expected answer against the documents:
+37 about NABARD figures and policies, 9 about central MSME schemes, 4 about state policies,
+and 3 that it *shouldn't* answer (like "Who won the IPL in 2018?").
+
+| | Result |
 |---|---|
-| Retrieval hit@6 (all expected facts in the top-6 context) | **0.96** (48/50; the 4 state questions all hit) |
-| Retrieval hit@1 / MRR | 0.60 / 0.735 |
-| MSME scheme answers (Groq `gpt-oss-120b`): fact recall / cited | **1.0 / 1.0** (9/9) |
-| Out-of-scope questions declined (SBI home loan rate, IPL, Tamil Nadu MSME policy) | **3/3** (measured before Tamil Nadu was added; that item is now Kerala and not yet re-run) |
-| Fact recall of answers, *extractive mode, no LLM* (2-report corpus) | 0.784 |
+| The right passage is among the 6 the model sees | **96%** (48 of 50) |
+| ...and it's the very first one | 60% |
+| MSME scheme answers containing the correct facts, with citations | **9 of 9** |
+| Out-of-scope questions it declined | **3 of 3** |
 
-The two retrieval misses are table rows whose multi-line row label was split from the numbers
-during extraction (SHG savings) and an auditor name that only appears in a signature block.
+The two misses: a table whose row label got split from its numbers, and an auditor's name that
+only appears in a signature block.
 
-**Personal eligibility questions.** The cross-encoder was trained on short web queries. It scores a
-long first-person question ("I am a 24 year old woman in a rural area… can I get PMEGP subsidy?")
-at −2.7 even when the right passage is retrieved, which fails the gate. When nothing clears the
-gate, the service condenses the question into a search query that keeps the eligibility attributes
-("PMEGP subsidy eligibility female 24 rural food processing 30 lakh", which scores +2.3) and retries
-once. That question now gets the correct, cited answer: Special Category, 35% of ₹30 lakh =
-₹10.5 lakh. If still nothing is relevant, the reply is a fixed decline with no LLM call. Before
-this, the model was given an empty context and guessed a wrong subsidy rate.
+The out-of-scope check was run when the third question was about Tamil Nadu's policy, before
+that document was added. That question now asks about Kerala and hasn't been re-run yet.
 
-**Feedback loop, measured.** The demo ran on a copy of the feedback DB.
-- A user asked "What guarantee cover does CGTMSE give to women entrepreneurs?", rated source #3
-  relevant and #1 irrelevant.
-- Then a different phrasing was asked: "How much CGTMSE guarantee coverage do women-led small
-  businesses get?". The rated-irrelevant passage was demoted (−0.37). The rated-relevant passage,
-  which this phrasing hadn't retrieved at all, was recalled to rank 7 (+0.37). One rating is
-  bounded on purpose; agreement from more users raises it further.
-- An unrelated question (PM Vishwakarma toolkit) kept exactly the same ranking.
-- `tests/test_feedback.py` locks in the reordering, the similarity scoping and the recall.
+## The fine-tuned model
 
-**Query adapter (the embedding side).** It was last retrained after the Tamil Nadu and Gujarat
-documents were added (87 new heading pseudo-queries, on top of the earlier heading, synthetic and
-LLM-written MSME pairs). On held-out pairs, recall@5 went from 0.606 to 0.628 and MRR from 0.434
-to 0.463, so it was accepted. Golden-set retrieval barely moves (MRR 0.702 without it, 0.707 with
-it; hit@6 0.96 both ways), because the cross-encoder decides the final order. No real user feedback exists yet; ratings collected in the
-UI become `feedback` pairs for the next `nabard-qa train-adapter`.
+I also fine-tuned a small open model (Qwen2.5-1.5B) so the assistant can run fully offline, on
+a laptop, with no API at all. Everything ran on free tiers:
+- the training questions were written by an LLM from the documents (`training/build_sft_dataset.py`);
+- training ran on a free Colab / Kaggle GPU (`training/finetune_colab.ipynb`);
+- the result runs on an ordinary CPU through llama.cpp (`scripts/serve_local_model.ps1`).
 
-**Groq (`openai/gpt-oss-120b`), partial run:** 25 of 40 questions were rate-limited (HTTP 429)
-on the free tier before retry-with-backoff was added. On the 15 questions it answered: fact recall
-0.833 on 12 answerable, 11/12 cited, 3/3 out-of-scope declined.
+The training set mixes each question's true source passage with similar-looking distractors.
+About 15% of examples have *no* correct passage, where the right answer is "the documents don't
+say". The goal was a model that cites its sources and knows when to refuse, not one that
+memorises facts.
 
-## Quickstart
+That's exactly what happened:
+
+| | Fine-tuned | Original model |
+|---|---|---|
+| Answers with the correct facts | 75% | 75% |
+| Answers that cite their sources | **8 of 8** | 6 of 8 |
+| Out-of-scope question | **declined** | made up an answer ("SBI home loan rate is 8.5% [S1]") |
+
+A second version trained with extra MSME questions didn't beat the first (76% vs 74% facts, one
+wrongly refused question), so the first one stays the default. On a laptop CPU it takes 45–65
+seconds per answer, so it's the last fallback, not the main model.
+
+## Run it yourself
+
+You need Python 3.11+ and, optionally, a free API key from [Groq](https://console.groq.com)
+and/or [Google AI Studio](https://aistudio.google.com) (Gemini). No GPU needed.
 
 ```bash
 python -m venv .venv && .venv/Scripts/activate      # Windows; use bin/activate on Linux/macOS
 pip install -e ".[dev]"
 cp .env.example .env                                  # add GROQ_API_KEY and/or GEMINI_API_KEY
 
-# put the reports in data/raw/ (download from nabard.org → Publications → Annual Reports)
-nabard-qa ingest           # ~2 min extraction + ~7 min CPU embedding the first time; re-runs are incremental
-nabard-qa serve            # http://127.0.0.1:8000
+# put the PDFs in data/raw/ (titles and years go in data/raw/manifest.json)
+nabard-qa ingest           # builds the search index; re-runs only process what changed
+nabard-qa serve            # open http://127.0.0.1:8000
 ```
 
-The first run downloads two small ONNX models (bge-small-en-v1.5 and ms-marco-MiniLM-L-6) into
-`data/models/`. No GPU is needed. Without an API key the app still runs: it returns quoted extracts
-with citations and says that it is doing so.
+The first run downloads two small models (about 150 MB). With no API key at all, it still
+works: it shows the most relevant quoted passages instead of a written answer, and says so.
 
-Docker:
-```bash
-docker compose run --rm ingest && docker compose up -d api
-```
+**Docker:** `docker compose run --rm ingest && docker compose up -d api`
 
-### Deployment
+**Deploying:** the Docker image downloads a prebuilt 30 MB search index from this repo's
+GitHub release (checksum verified), so a server needs no PDFs and no indexing. `render.yaml`
+sets it up on Render: Dashboard → New → Blueprint → this repo, then paste the two API keys.
+The free plan sleeps after 15 idle minutes and forgets collected feedback on each redeploy.
 
-The image ships with the search index built in: `scripts/fetch_index.py` downloads a 30 MB bundle
-(Chroma index + query adapter) from this repo's GitHub release and checks its SHA-256, and both ONNX
-models are downloaded at build time. A cold start needs no PDFs and no ingest.
+**Adding documents:** drop PDFs in `data/raw/`, give each a title and year in `manifest.json`,
+and run `nabard-qa ingest`. For scanned PDFs, run `scripts/make_searchable_pdf.py` on them first.
 
-It runs on **Render's free plan** (`render.yaml`: Dashboard → New → Blueprint → this repo, then
-enter `GROQ_API_KEY` and `GEMINI_API_KEY`). Render rebuilds on every push to `main`; GitHub Actions
-runs the tests.
+## Reference
 
-Fitting 512 MB took one change. Peak memory was ~750 MB, and almost all of the excess came from the
-cross-encoder scoring passages 16 at a time: every pair was padded to the longest passage, and the
-ONNX runtime kept that buffer. Scoring one pair at a time gives identical scores, is faster on CPU
-(2.8 s vs 6.6 s for 40 passages), and brings the peak to ~465 MB: Chroma ~95 MB, embedding model
-~150 MB, reranker ~100 MB, a query ~45 MB.
+### Command line
 
-The free plan also has only 0.1 CPU, and the first deploy took ~34 s per question, almost all of
-it in the cross-encoder. Two changes cut reranking 2.4x on the golden set: the int8-quantized ONNX
-file of the same model, and scoring only the first 128 words of each passage. hit@6 stayed at 0.96
-and hit@1 rose from 0.54 to 0.60 (the opening of a passage is its most specific part). 96 words was
-too few (hit@6 0.86), and reranking 10 candidates instead of 15 lost two questions.
-
-| Reranker (15 candidates) | hit@6 | hit@1 | MRR | time/question (local) |
-|---|---|---|---|---|
-| fp32, full passage | 0.96 | 0.54 | 0.707 | 0.85 s |
-| int8, full passage | 0.96 | 0.54 | 0.707 | 0.47 s |
-| **int8, first 128 words** (default) | **0.96** | **0.60** | **0.735** | **0.35 s** |
-| int8, first 96 words | 0.86 | 0.48 | 0.606 | 0.29 s |
-
-The free plan sleeps after 15 minutes idle (about a minute to wake) and has no persistent disk, so
-feedback collected there resets on each deploy or restart.
-
-## CLI
-
-| Command | Purpose |
+| Command | What it does |
 |---|---|
-| `nabard-qa ingest [paths…]` | extract → chunk → embed → index. Unchanged chunks are skipped and removed ones are deleted |
-| `nabard-qa ask "…" [--year 2017-18] [--profile "woman entrepreneur, SC, Assam"]` | answer in the terminal |
-| `nabard-qa serve` | API + web UI |
-| `nabard-qa eval [--retrieval-only]` | golden-set metrics |
-| `nabard-qa bootstrap-pairs` | seed adapter training pairs from section headings |
-| `nabard-qa train-adapter` | train the feedback query adapter; prints golden retrieval before and after |
-| `nabard-qa stats` / `export-feedback out.jsonl` | monitoring and data export |
+| `nabard-qa ingest [paths…]` | extract, split, embed and index PDFs (unchanged passages are skipped) |
+| `nabard-qa ask "…" [--year 2017-18] [--profile "woman, SC, Assam"]` | answer one question in the terminal |
+| `nabard-qa serve` | web app + API |
+| `nabard-qa eval [--retrieval-only]` | run the 53 test questions |
+| `nabard-qa bootstrap-pairs` / `train-adapter` | seed and retrain the feedback query adapter |
+| `nabard-qa stats` / `export-feedback out.jsonl` | usage stats and feedback export |
 
-## API
+### API
 
 | Endpoint | |
 |---|---|
-| `POST /api/ask` | `{question, history?, year?, profile?}` → answer, citations (report, pages, section, snippet, cited?), grounded flag, `answer_id` |
-| `POST /api/ask/stream` | same input; server-sent events: `sources` → `delta`… → `done` |
-| `POST /api/feedback` | `{answer_id, rating: 1\|-1, comment?, relevant_chunk_ids?, irrelevant_chunk_ids?}` |
-| `GET /health`, `GET /api/stats` | status, provider, index size, adapter state |
-| `POST /api/admin/train-adapter` | retrain and hot-reload the adapter (`Authorization: Bearer $NABARD_QA_ADMIN_TOKEN`) |
+| `POST /api/ask` | `{question, history?, year?, profile?, mode?}` → answer, citations, `grounded`, `answer_id` |
+| `POST /api/ask/stream` | same, streamed as server-sent events: `sources` → `delta`… → `done` |
+| `POST /api/feedback` | `{answer_id, rating: 1 or -1, comment?, relevant_chunk_ids?, irrelevant_chunk_ids?}` |
+| `GET /health`, `GET /api/stats` | status, models, index size |
+| `POST /api/admin/train-adapter` | retrain the query adapter (needs `NABARD_QA_ADMIN_TOKEN`) |
 
-Requests are rate-limited per IP and capped by question length. Each response carries a request ID
-that also appears in the logs. If a model call fails, the service falls back to extracts instead of
-returning an error.
+Requests are rate-limited per IP. If every language model is unavailable, you get quoted
+passages instead of an error.
 
-## Generation and prompts
+### Models and settings
 
-* Models: Groq `openai/gpt-oss-120b` answers first, Gemini `gemini-3.6-flash` is the backup and the
-  long-context Deep-mode model, and the fine-tuned local model can be added as the last fallback. All
-  three are called through the OpenAI-compatible chat API, with streaming. Models and order are set in `.env`.
-* The system prompt (`generation/prompts.py`) is fixed text. It requires a citation for every claim,
-  an explicit "not in the reports" instead of guesses, figures copied exactly with units and dates,
-  separate figures for each report year, and a structure for scheme questions: what it is,
-  eligibility, terms, how to access. When an applicant profile is supplied, it checks the profile
-  against each eligibility condition. Answers come back in the user's language. Passages are wrapped
-  as XML data and the prompt says to ignore any instructions found inside them.
-* **Personalisation.** The UI has an optional profile: state, gender, social category, rural or
-  urban, sector, new or existing unit, age, amount needed. It is kept in the browser's localStorage
-  and sent with each question as `profile`. It does two things:
-  - the prompt checks each eligibility condition against it ("SC applicant -> 35% rate applies: met");
-  - for a personal question that names no central scheme or state ("which capital subsidy can I
-    get?"), the applicant's state is added to the search query, so a Tamil Nadu user gets the Tamil
-    Nadu policy and a Gujarat user gets the Gujarat GR (`service.personalised_query`).
-* Follow-up questions are rewritten into standalone search queries at `low` reasoning effort.
-* **Provider chain.** Keys come from `GROQ_API_KEY` and `GEMINI_API_KEY`. With
-  `NABARD_QA_LLM_PROVIDER=auto`, every provider that has a key forms a chain in
-  `NABARD_QA_LLM_CHAIN` order (default `groq,gemini`). If a provider fails before writing any
-  text (rate limit, quota, outage, retired model), the next one answers. Quoted extracts are the last
-  resort. The provider that actually answered is shown on each answer.
-* **Deep mode** (UI "Mode: Deep", CLI `--deep`, API `"mode": "deep"`) is for comparisons, summaries and
-  "list all …" questions. It reranks 80 candidates and sends about 40 passages (~15–20k tokens) to the
-  long-context provider (`NABARD_QA_DEEP_PROVIDER=gemini`), with the normal chain as its backup. Normal
-  questions only need about 6 passages, so they go to the fast provider.
-  If the long-context call fails, the question is re-asked through the normal chain with only the top
-  passages. The 40-passage prompt (~10k tokens) is larger than Groq's free-tier limit of 8k tokens per
-  minute, so it is not passed down the chain as-is.
-* `python scripts/list_models.py groq|gemini` lists the models your key can see. Listed does not mean
-  usable: `gemini-2.5-*` is listed but returns 404 for new accounts. Speed also varies a lot between
-  models, so check with `scripts/probe_provider.py gemini`. The default is `gemini-3.6-flash`
-  (`3.8-flash` was overloaded during testing).
-* Measured with `scripts/stream_timing.py`: Fast (Groq `gpt-oss-120b`) shows first text at ~3.3 s and
-  completes at ~4 s; Deep (Gemini `3.6-flash`, 40 passages) shows first text at ~10.4 s and completes at
-  ~11–14 s. Answers stream over SSE: Groq in hundreds of small pieces, Gemini in ~20 larger chunks.
+- **Answers:** Groq `openai/gpt-oss-120b` first, then Gemini `gemini-3.6-flash`, optionally the
+  local fine-tuned model last (`NABARD_QA_LLM_CHAIN=groq,gemini,local`). If one is down or
+  rate-limited, the next answers straight away. The page shows which one answered.
+- **Deep mode** (in the UI's Mode menu) sends about 40 passages to Gemini, for comparisons and
+  "list all…" questions.
+- **Search:** `BAAI/bge-small-en-v1.5` embeddings in ChromaDB, BM25, and an
+  `ms-marco-MiniLM-L-6-v2` re-ranker, all running locally on CPU.
+- **Prompt** (`generation/prompts.py`): cite every claim; say when the documents don't cover
+  something; copy figures exactly with units and dates; give each year's figure separately; for
+  schemes, cover what it is, who's eligible, the terms and how to apply; answer in the user's
+  language. Passages are passed as data, and any instructions inside them are ignored.
+- All settings live in `.env` (see `.env.example`).
 
-## Fine-tuning
-
-Only free tiers are needed, and no local GPU:
-
-| Step | Where | Command |
-|---|---|---|
-| 1. Write training Q&A | your PC + Groq or Gemini key | `python training/build_sft_dataset.py --limit 150` (Groq by default, `--provider gemini`; `--fallback-provider gemini` switches over when Groq's daily cap is hit) |
-| 2. Check the dataset | your PC | `python training/finetune_lora.py --validate-only` |
-| 3. QLoRA training + GGUF export | **free Colab/Kaggle T4** | open `training/finetune_colab.ipynb`, upload `finetune_lora.py`, `sft_train.jsonl`, `sft_val.jsonl` |
-| 4. Run the model on CPU | your PC + llama.cpp | download `adapter.zip` from Colab into `out/nabard-qa-lora/`, convert it with `llama.cpp/convert_lora_to_gguf.py` (config files only), then `scripts/serve_local_model.ps1` (port 8001, matches the `local` provider defaults) |
-| 4b. Or with Ollama | your PC + [Ollama](https://ollama.com) | `ollama create nabard-qa -f training/ollama/Modelfile.adapter` (base `qwen2.5:1.5b-instruct` + adapter), then set `NABARD_QA_LOCAL_BASE_URL=http://localhost:11434/v1` and `NABARD_QA_LOCAL_MODEL=nabard-qa` |
-
-Notes:
-* Step 1 resumes where it stopped, waits out rate limits, and validates every JSON reply.
-  Groq's free tier (8k tokens/minute) allows roughly 3 passages a minute. If the daily cap is hit,
-  re-run the next day and only the remaining passages are processed.
-* `--fallback-provider gemini` switches to Gemini as soon as Groq reports its daily cap ("tokens per
-  day"), or after 3 rate-limit waits in a row, instead of retrying until tomorrow. Each pair records
-  which model wrote it (`generator` in `synthetic_qa.jsonl`). `--match "^(?!NABARD)"` limits
-  sampling to the MSME documents. It samples evenly across documents and skips admin passages
-  (Hindi Pakhwada, vigilance, receipt formats) that only produce trivia.
-* Licence: `gpt-oss-120b` (the Groq default) has Apache-2.0 open weights. Google's Gemini API terms
-  restrict using outputs to develop competing models, so check them before training on Gemini output.
-  Gemini-written pairs can be filtered out by their `generator` field.
-* Step 3 picks fp16 automatically on a T4 (which has no bf16) and defaults to batch size 1 with
-  16-step gradient accumulation to fit 16 GB.
-* The Modelfile sets `num_ctx 8192`. Ollama's smaller default would silently cut off the source
-  passages.
-* Step 4 skips merging. The 74 MB adapter is applied at load time to a 4-bit (Q4_K_M) base, so you
-  download 1 GB instead of the 3 GB fp16 base and its merge. That matches training, which used a
-  4-bit (QLoRA) base too. Colab's preinstalled torchao 0.10 breaks PEFT's merge step; the notebook
-  uninstalls it.
-* All four steps have been run end to end: Qwen2.5-1.5B-Instruct, 354 training examples, 2 epochs on
-  a free Colab T4, served by llama.cpp on a laptop CPU.
-
-The dataset is RAFT-style. Each question is paired with its source passage mixed among retrieved
-distractor passages, under shuffled `[S#]` labels. About 15% of examples contain only distractors and
-the target is a refusal. Thumbs-up answers from real users are added. The train/validation split is
-by source passage, so no passage appears in both. The loss covers the answer tokens only. The same
-synthetic questions also feed the query adapter (`origin="synthetic"`).
-
-Measured effect of the adapter on 8 answerable and 1 out-of-scope golden questions. Retrieval and
-prompts were identical; the adapter was switched on and off with llama-server's `/lora-adapters`.
-
-| | Fine-tuned | Base Qwen2.5-1.5B |
-|---|---|---|
-| Fact recall | 0.75 | 0.75 |
-| Answers citing `[S#]` | **8/8** | 6/8 |
-| Out-of-scope question | **declined** | invented an answer ("SBI home loan rate is 8.5% [S1]") |
-| Wrongly refused answerable questions | 0 | 0 |
-
-So fine-tuning taught the model the citation format and to refuse, not new facts. Facts come from
-retrieval. Both models missed st-01. That was partly an extraction bug, now fixed: table cells set
-in another font start a fraction of a point higher, so values sorted ahead of their row label. Even
-with the corrected table, the 1.5B model still takes a value from the wrong column, while
-`gpt-oss-120b` answers it correctly.
-
-A second adapter (v2) was trained on Kaggle with 263 more pairs from the MSME scheme documents
-(`training/ollama/nabard-qa-lora-v2-f16.gguf`). On 14 answerable and 3 out-of-scope golden
-questions (9 MSME, 5 NABARD), one run each:
-
-| | v1 (NABARD only, default) | v2 (+ MSME) |
-|---|---|---|
-| Fact recall | **0.762** | 0.738 |
-| Answers citing `[S#]` | **14/14** | 13/14 |
-| Wrongly refused answerable questions | **0** | 1 (vish-01) |
-| Out-of-scope declined | 2/3 | 2/3 |
-
-v2 won cgtmse-01 but lost pmegp-01 and vish-01. With 17 questions that is within noise, so v2 did
-not earn the switch and v1 stays the default. Both models answered na-04 (Tamil Nadu MSME policy)
-from the UP policy instead of declining.
-
-A 1.5B model on CPU takes 45–65 s per answer here, against about 3 s on Groq. Its value is free,
-offline or on-premise serving, so add it as the last fallback:
-`NABARD_QA_LLM_CHAIN=groq,gemini,local`. If its server isn't running, the chain skips it
-immediately.
-
-## Project layout
+### Project layout
 
 ```
 src/nabard_qa/
-  ingestion/   glyphs.py · pdf_extract.py · cleaning.py · chunking.py · pipeline.py
-  retrieval/   embeddings.py · vector_store.py · lexical.py · reranker.py · adapter.py · hybrid.py
-  generation/  prompts.py · llm.py   (Groq / Gemini / local, all OpenAI-compatible; extractive)
-  feedback/    store.py (SQLite) · learner.py
-  service.py   evaluation.py   cli.py   config.py   schemas.py
-  api/         app.py · static/index.html
-training/      build_sft_dataset.py · finetune_lora.py
-eval/          golden_set.jsonl
-scripts/       debug_retrieval.py · calibrate_gate.py · make_searchable_pdf.py + ocr_pages.ps1 (OCR)
-tests/         70 tests: unit tests with fakes, a service and API end-to-end test, and a real-PDF integration test
+  ingestion/   PDF extraction and repair, cleaning, splitting into passages
+  retrieval/   embeddings, ChromaDB, BM25, re-ranker, query adapter, hybrid search
+  generation/  prompts and the LLM provider chain
+  feedback/    ratings store (SQLite) and adapter training
+  api/         FastAPI app and the web page
+  service.py   ties it all together
+training/      dataset builder, LoRA fine-tuning script and notebook
+eval/          the 53 hand-checked test questions
+scripts/       OCR, timing and debugging tools, index download for deploys
+tests/         71 tests
 ```
 
-## Known limitations
+## What's not great yet
 
-* Scheme coverage is what's in `data/raw`. Not included:
-  - the Udyam registration notification (no official PDF was found);
-  - state policies other than Uttar Pradesh, Tamil Nadu and Gujarat. Karnataka's 2025-30 policy
-    had no official PDF that could be found;
-  - the 2022 PMEGP guidelines (the KVIC site was unreachable; the revised guidelines are included).
-  The UP policy's capital-subsidy table didn't survive extraction, so those rates can't be answered.
-* The Gujarat GR is OCR text: its rates read correctly, but some table labels are garbled
-  ("Cate o of taluka"). For a vague question such as "which capital subsidy can I get?" from a
-  Gujarat profile, its capital-subsidy table ranks 9th, just outside the 6 passages the model sees.
-  Naming the subsidy ("capital investment subsidy") brings it to 3rd.
-* The MSME-aware adapter (v2) covers only 90 MSME passages because the Groq and Gemini daily quotas
-  ran out, and it did not beat v1. Generating the remaining ~34 passages and retraining may change that.
-* Some table rows lose their multi-line row labels during extraction, so the numbers survive but
-  their row name doesn't.
-* The rate limiter and feedback boost cache run in-process. For multiple replicas, put a gateway in
-  front and use a shared database instead of SQLite.
+- **Speed on the free server**: 20–35 seconds per answer, almost all of it the re-ranker on a
+  tenth of a CPU. A paid instance fixes it without code changes.
+- **Coverage**: only three states (UP, Tamil Nadu, Gujarat). I couldn't find official PDFs for
+  Karnataka's new policy, the Udyam registration rules, or the 2022 PMEGP guidelines. UP's
+  capital-subsidy table didn't extract cleanly, so those rates can't be answered.
+- **The Gujarat document is OCR text**: the rates read correctly, but some table labels are
+  garbled ("Cate o of taluka"). A vague question from a Gujarat profile sometimes misses its
+  subsidy table. Naming the subsidy ("capital investment subsidy") finds it.
+- **Some multi-line table row labels** still get separated from their numbers.
+- **No real user feedback yet**: the feedback loop is tested with demo ratings, and the live
+  server's free disk forgets ratings when it redeploys.
+- **Built for one server**: rate limits and feedback caches live in memory. Scaling out would
+  need a shared database instead of SQLite.
